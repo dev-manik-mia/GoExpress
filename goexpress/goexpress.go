@@ -5,11 +5,11 @@ import (
 	"net/http"
 )
 
-// RouteHandler is our custom type for GoExpress route logic
-type RouteHandler func(w http.ResponseWriter, r *http.Request)
+// UPGRADE 1: The Secret Sauce Pays Off!
+// We simply swap out (w, r) for our new (*Context)
+type RouteHandler func(c *Context)
 
 type Engine struct {
-	// Updated the map to use the new RouteHandler type
 	router map[string]RouteHandler
 }
 
@@ -17,7 +17,6 @@ func New() *Engine {
 	return &Engine{router: make(map[string]RouteHandler)}
 }
 
-// GET now accepts the GoExpress RouteHandler type
 func (e *Engine) GET(path string, handler RouteHandler) {
 	e.router["GET-"+path] = handler
 }
@@ -25,7 +24,13 @@ func (e *Engine) GET(path string, handler RouteHandler) {
 func (e *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	key := r.Method + "-" + r.URL.Path
 	if routeHandler, ok := e.router[key]; ok {
-		routeHandler(w, r)
+
+		// UPGRADE 2: Package the raw Go variables into our custom Context
+		c := newContext(w, r)
+
+		// Pass the Context to the developer's code
+		routeHandler(c)
+
 	} else {
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprintf(w, "404 NOT FOUND: %s\n", r.URL)

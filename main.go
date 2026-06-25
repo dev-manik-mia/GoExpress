@@ -1,21 +1,26 @@
 package main
 
 import (
-	"net/http"
-
 	"github.com/dev-manik-mia/goexpress"
 )
 
 func main() {
-	// 1. Create a new, isolated instance of our framework
 	g := goexpress.New()
 
-	// 2. Register our route using the custom helper
-	g.GET("/", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Welcome to Go Framework Lab 1!\n"))
+	// Using the new c.String() helper
+	g.GET("/", func(c *goexpress.Context) {
+		c.String(200, "Welcome to GoExpress Lab 2! The context works.\n")
 	})
 
-	// 3. Launch the server, passing our Engine in to replace 'nil'
-	g.Run(":8080")
+	// Using the new c.JSON() helper
+	g.GET("/api/info", func(c *goexpress.Context) {
+		// We can pass a Go map directly, and the framework handles the JSON translation
+		c.JSON(200, map[string]interface{}{
+			"framework": "GoExpress",
+			"version":   "2.0",
+			"author":    "Manik Mia",
+		})
+	})
+
+	g.Run(":8082")
 }
