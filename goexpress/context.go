@@ -5,8 +5,6 @@ import (
 	"net/http"
 )
 
-// Context wraps the standard library request and response,
-// providing a simplified developer experience.
 type Context struct {
 	Writer http.ResponseWriter
 	Req    *http.Request
@@ -14,7 +12,6 @@ type Context struct {
 	Method string
 }
 
-// newContext is the internal factory for creating a Context per request
 func newContext(w http.ResponseWriter, r *http.Request) *Context {
 	return &Context{
 		Writer: w,
@@ -43,4 +40,12 @@ func (c *Context) JSON(code int, obj interface{}) {
 	if err := encoder.Encode(obj); err != nil {
 		http.Error(c.Writer, err.Error(), 500)
 	}
+}
+
+// BindJSON reads the incoming HTTP request body and decodes it into a Go struct.
+func (c *Context) BindJSON(obj interface{}) error {
+	decoder := json.NewDecoder(c.Req.Body)
+	// Important: We must close the body after reading it to prevent memory leaks
+	defer c.Req.Body.Close()
+	return decoder.Decode(obj)
 }
