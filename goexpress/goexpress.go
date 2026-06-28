@@ -21,6 +21,21 @@ func (e *Engine) GET(path string, handler RouteHandler) {
 	e.router["GET-"+path] = handler
 }
 
+// POST registers a new POST route for creating data
+func (e *Engine) POST(path string, handler RouteHandler) {
+	e.router["POST-"+path] = handler
+}
+
+// PUT registers a new PUT route for updating data
+func (e *Engine) PUT(path string, handler RouteHandler) {
+	e.router["PUT-"+path] = handler
+}
+
+// DELETE registers a new DELETE route for removing data
+func (e *Engine) DELETE(path string, handler RouteHandler) {
+	e.router["DELETE-"+path] = handler
+}
+
 func (e *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	key := r.Method + "-" + r.URL.Path
 	if routeHandler, ok := e.router[key]; ok {
