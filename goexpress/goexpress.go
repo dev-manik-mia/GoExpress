@@ -8,42 +8,47 @@ import (
 type RouteHandler func(c *Context)
 
 type Engine struct {
-	router map[string]RouteHandler
+	// Replaced the map with our custom Trie router
+	router *router
 }
 
 func New() *Engine {
-	return &Engine{router: make(map[string]RouteHandler)}
+	return &Engine{router: newRouter()}
 }
 
-func (e *Engine) GET(path string, handler RouteHandler) {
-	e.router["GET-"+path] = handler
+// addRoute is a private helper to pass data to the router
+func (e *Engine) addRoute(method string, pattern string, handler RouteHandler) {
+	e.router.addRoute(method, pattern, handler)
 }
 
-// POST registers a new POST route for creating data
-func (e *Engine) POST(path string, handler RouteHandler) {
-	e.router["POST-"+path] = handler
+func (e *Engine) GET(pattern string, handler RouteHandler) {
+	e.addRoute("GET", pattern, handler)
 }
 
-// PUT registers a new PUT route for updating data
-func (e *Engine) PUT(path string, handler RouteHandler) {
-	e.router["PUT-"+path] = handler
+func (e *Engine) POST(pattern string, handler RouteHandler) {
+	e.addRoute("POST", pattern, handler)
 }
 
-// PATCH registers a new PATCH route for updating data
-func (e *Engine) PATCH(path string, handler RouteHandler) {
-	e.router["PATCH-"+path] = handler
+func (e *Engine) PUT(pattern string, handler RouteHandler) {
+	e.addRoute("PUT", pattern, handler)
 }
 
-// DELETE registers a new DELETE route for removing data
-func (e *Engine) DELETE(path string, handler RouteHandler) {
-	e.router["DELETE-"+path] = handler
+func (e *Engine) DELETE(pattern string, handler RouteHandler) {
+	e.addRoute("DELETE", pattern, handler)
 }
 
 func (e *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	key := r.Method + "-" + r.URL.Path
-	if routeHandler, ok := e.router[key]; ok {
+	// 1. Ask the router if a matching node exists for this Method and Path
+	node, params := e.router.getRoute(r.Method, r.URL.Path)
+
+	if node != nil {
 		c := newContext(w, r)
-		routeHandler(c)
+		// 2. Inject the extracted dynamic parameters into the context
+		c.Params = params
+
+		// 3. Execute the handler mapped to the discovered pattern
+		key := r.Method + "-" + node.pattern
+		e.router.handlers[key](c)
 	} else {
 		w.WriteHeader(http.StatusNotFound)
 		fmt.Fprintf(w, "404 NOT FOUND: %s\n", r.URL)
