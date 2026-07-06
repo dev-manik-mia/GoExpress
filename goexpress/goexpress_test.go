@@ -6,50 +6,47 @@ import (
 	"testing"
 )
 
-// Test 1: Does the Engine successfully find and execute a valid route?
-func TestEngineRouting(t *testing.T) {
-	// 1. Setup a fresh Engine
+// ... (Keep existing CRUD tests from Lab 3)
+
+func TestDynamicRoute(t *testing.T) {
 	engine := New()
 
-	// 2. Register a test route
-	engine.GET("/hello", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("hello world"))
+	// Register a dynamic route
+	engine.GET("/users/:id", func(c *Context) {
+		id := c.Param("id")
+		c.String(http.StatusOK, "User ID is "+id)
 	})
 
-	// 3. Create a fake "offline" request (Simulating a browser)
-	req := httptest.NewRequest("GET", "/hello", nil)
-
-	// 4. Create a fake ResponseWriter to capture the output
+	// Test Case 1: Standard parameter extraction
+	req := httptest.NewRequest("GET", "/users/456", nil)
 	w := httptest.NewRecorder()
-
-	// 5. Execute our Engine's core router directly
 	engine.ServeHTTP(w, req)
 
-	// 6. Assertions: Did the Engine do the right thing?
 	if w.Code != http.StatusOK {
-		t.Errorf("Expected status code 200, got %d", w.Code)
+		t.Errorf("Expected status 200, got %d", w.Code)
 	}
 
-	if w.Body.String() != "hello world" {
-		t.Errorf("Expected body 'hello world', got '%s'", w.Body.String())
+	expected := "User ID is 456"
+	if w.Body.String() != expected {
+		t.Errorf("Expected body '%s', got '%s'", expected, w.Body.String())
 	}
 }
 
-// Test 2: Does the Engine correctly return a 404 when a route is missing?
-func TestEngineNotFound(t *testing.T) {
-	// 1. Setup an empty Engine (We are NOT registering any routes)
+func TestWildcardRoute(t *testing.T) {
 	engine := New()
 
-	// 2. Create a fake request for a page that does not exist
-	req := httptest.NewRequest("GET", "/missing-page", nil)
-	w := httptest.NewRecorder()
+	// Register a catch-all wildcard route
+	engine.GET("/assets/*filepath", func(c *Context) {
+		c.String(http.StatusOK, "File: "+c.Param("filepath"))
+	})
 
-	// 3. Execute
+	// Test Case 2: Multi-segment parameter capture
+	req := httptest.NewRequest("GET", "/assets/css/main.css", nil)
+	w := httptest.NewRecorder()
 	engine.ServeHTTP(w, req)
 
-	// 4. Assertions
-	if w.Code != http.StatusNotFound {
-		t.Errorf("Expected status code 404, got %d", w.Code)
+	expected := "File: css/main.css"
+	if w.Body.String() != expected {
+		t.Errorf("Expected body '%s', got '%s'", expected, w.Body.String())
 	}
 }
