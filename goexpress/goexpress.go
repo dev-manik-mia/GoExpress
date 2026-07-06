@@ -5,24 +5,23 @@ import (
 	"net/http"
 )
 
+// Engine is the core framework instance
 type Engine struct {
-	router *router
-	// NEW: Store global middleware functions
-	middlewares []RouteHandler
+	*RouterGroup // Struct Embedding: Engine inherits all methods of RouterGroup
+	router       *router
 }
 
+// New creates a new GoExpress Engine
 func New() *Engine {
-	return &Engine{router: newRouter()}
+	engine := &Engine{router: newRouter()}
+	// The Engine initializes itself as the absolute Root Group ("")
+	engine.RouterGroup = &RouterGroup{engine: engine}
+	return engine
 }
 
 // NEW: Use adds global middlewares to the framework instance
 func (e *Engine) Use(middlewares ...RouteHandler) {
 	e.middlewares = append(e.middlewares, middlewares...)
-}
-
-// addRoute is a private helper to pass data to the router
-func (e *Engine) addRoute(method string, pattern string, handler RouteHandler) {
-	e.router.addRoute(method, pattern, handler)
 }
 
 func (e *Engine) GET(pattern string, handler RouteHandler) {
@@ -40,28 +39,25 @@ func (e *Engine) PUT(pattern string, handler RouteHandler) {
 func (e *Engine) DELETE(pattern string, handler RouteHandler) {
 	e.addRoute("DELETE", pattern, handler)
 }
+
 func (e *Engine) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// 1. Create the briefcase
 	c := newContext(w, r)
 
-	// 2. Pre-load the global middlewares into the execution chain
-	c.handlers = append(c.handlers, e.middlewares...)
-
-	// 3. Find the specific route logic
 	node, params := e.router.getRoute(r.Method, r.URL.Path)
 	if node != nil {
 		c.Params = params
 		key := r.Method + "-" + node.pattern
-		// 4. Append the core handler to the END of the chain
-		c.handlers = append(c.handlers, e.router.handlers[key])
+
+		// Fetch the pre-calculated execution chain directly from the router
+		c.handlers = e.router.handlers[key]
 	} else {
-		// Append a 404 handler to the chain if route is missing
+		// 404 Handler
 		c.handlers = append(c.handlers, func(c *Context) {
 			c.String(http.StatusNotFound, "404 NOT FOUND")
 		})
 	}
 
-	// 5. Kick off the execution chain
+	// Kick off the execution chain
 	c.Next()
 }
 

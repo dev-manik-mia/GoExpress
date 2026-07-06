@@ -3,45 +3,87 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"time"
 
-	"github.com/dev-manik-mia/goexpress" // Update path
+	"github.com/dev-manik-mia/goexpress" // Update to your actual module path
 )
 
-// Logger is a custom middleware function
-func Logger() goexpress.RouteHandler {
+// Global Middleware
+func GlobalLogger() goexpress.RouteHandler {
 	return func(c *goexpress.Context) {
-		// 1. PRE-PROCESSING
-		t := time.Now()
-		fmt.Printf("[START] Request incoming: %s %s\n", c.Method, c.Path)
-
-		// 2. PASS CONTROL to the next middleware or handler
+		fmt.Printf("[GLOBAL OMNIPRESENT LOG] Intercepted: %s %s\n", c.Method, c.Path)
 		c.Next()
+	}
+}
 
-		// 3. POST-PROCESSING (Executes after the entire request is handled)
-		latency := time.Since(t)
-		fmt.Printf("[END] Request completed: %s %s in %v\n", c.Method, c.Path, latency)
+// Middleware for /admin Group
+func AdminGuard() goexpress.RouteHandler {
+	return func(c *goexpress.Context) {
+		token := c.Req.Header.Get("X-Admin-Token")
+		if token != "super-secret-admin-pass" {
+			c.JSON(http.StatusUnauthorized, map[string]string{
+				"status": "Rejected",
+				"reason": "Administrative clearance token missing or invalid.",
+			})
+			return // Short-circuit the execution chain!
+		}
+		fmt.Println("[GUARD] Clearance confirmed. Transitioning inward...")
+		c.Next()
+	}
+}
+
+// Middleware for /something-else Group
+func ContextualTracker() goexpress.RouteHandler {
+	return func(c *goexpress.Context) {
+		fmt.Println("[TRACKER] Request routed directly into the 'Something-Else' cluster.")
+		c.Next()
 	}
 }
 
 func main() {
 	g := goexpress.New()
 
-	// Register global middleware using .Use()
-	g.Use(Logger())
+	// Apply Global Middleware
+	g.Use(GlobalLogger())
 
-	// A simple route to test the middleware
-	g.GET("/", func(c *goexpress.Context) {
-		// Simulate some heavy processing
-		time.Sleep(200 * time.Millisecond)
-		c.JSON(http.StatusOK, map[string]string{
-			"message": "Welcome to the Onion Model",
+	// ==========================================
+	// GROUP 1: /admin
+	// ==========================================
+	admin := g.Group("/admin")
+	admin.Use(AdminGuard())
+	{
+		// Resolves to: PUT /admin/users/:id
+		admin.PUT("/users/:id", func(c *goexpress.Context) {
+			id := c.Param("id")
+			c.JSON(http.StatusOK, map[string]string{
+				"action":  "PUT",
+				"message": fmt.Sprintf("User structure for ID %s has been completely overwritten.", id),
+			})
 		})
-	})
 
-	g.GET("/crash", func(c *goexpress.Context) {
-		panic("Simulated database failure!")
-	})
+		// Resolves to: DELETE /admin/users/:id
+		admin.DELETE("/users/:id", func(c *goexpress.Context) {
+			id := c.Param("id")
+			c.JSON(http.StatusOK, map[string]string{
+				"action":  "DELETE",
+				"message": fmt.Sprintf("User record with ID %s purged permanently from system storage.", id),
+			})
+		})
+	}
+
+	// ==========================================
+	// GROUP 2: /something-else
+	// ==========================================
+	somethingElse := g.Group("/something-else")
+	somethingElse.Use(ContextualTracker())
+	{
+		// Resolves to: PATCH /something-else/configurations
+		somethingElse.PATCH("/configurations", func(c *goexpress.Context) {
+			c.JSON(http.StatusOK, map[string]string{
+				"action":  "PATCH",
+				"message": "Specific configuration delta settings applied successfully.",
+			})
+		})
+	}
 
 	g.Run(":8080")
 }

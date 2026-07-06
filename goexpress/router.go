@@ -13,14 +13,19 @@ type node struct {
 }
 
 type router struct {
-	roots    map[string]*node        // Separate trees for each HTTP Method (GET, POST, etc.)
-	handlers map[string]RouteHandler // Maps the exact pattern to the developer's function
+	roots map[string]*node
+
+	// [UPDATE 1]: Changed from single RouteHandler to a slice []RouteHandler
+	// This allows the router to store the entire middleware chain + core handler
+	handlers map[string][]RouteHandler
 }
 
 func newRouter() *router {
 	return &router{
-		roots:    make(map[string]*node),
-		handlers: make(map[string]RouteHandler),
+		roots: make(map[string]*node),
+
+		// [UPDATE 2]: Initialize the map to hold slices of RouteHandlers
+		handlers: make(map[string][]RouteHandler),
 	}
 }
 
@@ -40,7 +45,8 @@ func parsePath(path string) []string {
 	return parts
 }
 
-func (r *router) addRoute(method string, pattern string, handler RouteHandler) {
+// [UPDATE 3]: The third parameter is now `handlers []RouteHandler` instead of `handler RouteHandler`
+func (r *router) addRoute(method string, pattern string, handlers []RouteHandler) {
 	parts := parsePath(pattern)
 	key := method + "-" + pattern
 
@@ -48,8 +54,12 @@ func (r *router) addRoute(method string, pattern string, handler RouteHandler) {
 		r.roots[method] = &node{}
 	}
 	r.insert(pattern, parts, 0, r.roots[method])
-	r.handlers[key] = handler
+
+	// [UPDATE 4]: Save the entire pipeline array into the map
+	r.handlers[key] = handlers
 }
+
+// ---- REST OF THE CODE IS AS SAME AS BEFORE ----
 
 // insert recursively builds the tree layer by layer
 func (r *router) insert(pattern string, parts []string, height int, n *node) {
