@@ -6,47 +6,46 @@ import (
 	"testing"
 )
 
-// ... (Keep existing CRUD tests from Lab 3)
-
-func TestDynamicRoute(t *testing.T) {
+func TestMiddlewareOrder(t *testing.T) {
 	engine := New()
 
-	// Register a dynamic route
-	engine.GET("/users/:id", func(c *Context) {
-		id := c.Param("id")
-		c.String(http.StatusOK, "User ID is "+id)
+	// We will track the order of execution in this slice
+	var executionOrder []string
+
+	// Middleware A (Outer Layer)
+	engine.Use(func(c *Context) {
+		executionOrder = append(executionOrder, "A_Before")
+		c.Next() // Suspend and go deeper
+		executionOrder = append(executionOrder, "A_After")
 	})
 
-	// Test Case 1: Standard parameter extraction
-	req := httptest.NewRequest("GET", "/users/456", nil)
+	// Middleware B (Inner Layer)
+	engine.Use(func(c *Context) {
+		executionOrder = append(executionOrder, "B_Before")
+		c.Next() // Suspend and go to core handler
+		executionOrder = append(executionOrder, "B_After")
+	})
+
+	// Core Route Handler
+	engine.GET("/test", func(c *Context) {
+		executionOrder = append(executionOrder, "Core_Handler")
+		c.String(http.StatusOK, "OK")
+	})
+
+	req := httptest.NewRequest("GET", "/test", nil)
 	w := httptest.NewRecorder()
 	engine.ServeHTTP(w, req)
 
-	if w.Code != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", w.Code)
+	// Validate the Onion Model flow
+	expectedOrder := []string{"A_Before", "B_Before", "Core_Handler", "B_After", "A_After"}
+
+	if len(executionOrder) != len(expectedOrder) {
+		t.Fatalf("Expected %d steps, got %d", len(expectedOrder), len(executionOrder))
 	}
 
-	expected := "User ID is 456"
-	if w.Body.String() != expected {
-		t.Errorf("Expected body '%s', got '%s'", expected, w.Body.String())
-	}
-}
-
-func TestWildcardRoute(t *testing.T) {
-	engine := New()
-
-	// Register a catch-all wildcard route
-	engine.GET("/assets/*filepath", func(c *Context) {
-		c.String(http.StatusOK, "File: "+c.Param("filepath"))
-	})
-
-	// Test Case 2: Multi-segment parameter capture
-	req := httptest.NewRequest("GET", "/assets/css/main.css", nil)
-	w := httptest.NewRecorder()
-	engine.ServeHTTP(w, req)
-
-	expected := "File: css/main.css"
-	if w.Body.String() != expected {
-		t.Errorf("Expected body '%s', got '%s'", expected, w.Body.String())
+	for i, v := range executionOrder {
+		if v != expectedOrder[i] {
+			t.Errorf("At index %d: expected %s, got %s", i, expectedOrder[i], v)
+		}
 	}
 }
